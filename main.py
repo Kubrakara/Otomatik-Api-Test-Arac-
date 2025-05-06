@@ -8,6 +8,7 @@ import time
 import random
 import re
 import google.generativeai as genai
+from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()  # .env dosyasını yükle
 
@@ -92,28 +93,58 @@ async def upload_swagger(file: UploadFile = File(...)):
 
 # ▶️ Swagger'dan test çalıştır
 @app.post("/run-tests")
-async def run_tests():
+async def run_tests(
+    base_url: Optional[str] = Body(None, embed=True),
+    filename: Optional[str] = Body(None, embed=True)
+):
+    """
+    Swagger tabanlı API testlerini çalıştırır.
+    `base_url` girilmemişse Swagger'dan alınır.
+    `filename` verilirse ilgili dosya test edilir, verilmezse son yüklenen dosya test edilir.
+    """
     try:
-        latest_file = max(
-            [os.path.join(UPLOAD_DIR, f) for f in os.listdir(UPLOAD_DIR) if f.endswith(".json")],
-            key=os.path.getctime
-        )
+        # Dosya yolu belirleme
+        if filename:
+            swagger_path = os.path.join(UPLOAD_DIR, filename)
+            if not os.path.isfile(swagger_path):
+                raise HTTPException(status_code=404, detail="Belirtilen Swagger dosyası bulunamadı.")
+        else:
+            swagger_path = max(
+                [os.path.join(UPLOAD_DIR, f) for f in os.listdir(UPLOAD_DIR) if f.endswith(".json")],
+                key=os.path.getctime
+            )
     except ValueError:
         raise HTTPException(status_code=404, detail="Hiçbir Swagger dosyası yüklenmemiş.")
 
-    with open(latest_file, "r", encoding="utf-8") as f:
+    # Swagger dosyasını oku
+    with open(swagger_path, "r", encoding="utf-8") as f:
         swagger_json = json.load(f)
 
-    servers = swagger_json.get("servers", [])
-    base_url = servers[0]["url"] if servers else "http://localhost:8000"
+    # Swagger'dan base URL tespiti
+    detected_base = None
+    if "openapi" in swagger_json:
+        servers = swagger_json.get("servers", [])
+        detected_base = servers[0]["url"] if servers else None
+    elif "swagger" in swagger_json:
+        scheme = swagger_json.get("schemes", ["http"])[0]
+        host = swagger_json.get("host", "")
+        base_path = swagger_json.get("basePath", "")
+        detected_base = f"{scheme}://{host}{base_path}"
 
+    # Kullanıcının gönderdiği base_url varsa onu kullan, yoksa Swagger'dan çıkar
+    final_base_url = base_url.strip() if base_url and base_url.strip() else detected_base
+
+    if not final_base_url:
+        raise HTTPException(status_code=400, detail="Base URL tespit edilemedi. Swagger'da da kullanıcıdan da gelmedi.")
+
+    # Test işlemleri
     test_results = []
     paths = swagger_json.get("paths", {})
 
     async with httpx.AsyncClient() as client:
         for path, methods in paths.items():
             for method, details in methods.items():
-                test_url = base_url + re.sub(r"\{[^}]*\}", "1", path)
+                test_url = final_base_url + re.sub(r"\{[^}]*\}", "1", path)
                 start_time = time.time()
 
                 if method.lower() == "get":
@@ -158,9 +189,11 @@ async def run_tests():
                             "success": False
                         })
 
-    # 🔴 LOG KAYDET
+    # Sonuçları dosyaya yaz
     result_data = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "swagger_file": os.path.basename(swagger_path),
+        "base_url": final_base_url,
         "test_count": len(test_results),
         "results": test_results
     }
@@ -174,6 +207,7 @@ async def run_tests():
         **result_data,
         "saved_as": result_filename
     }
+
 
 
 # 🌐 Swagger URL'den içe aktarma
@@ -320,24 +354,6 @@ def get_test_result(filename: str):
         return json.load(f)
     
 
-# 🎯 Örnek lokal test endpoint'leri
-@app.get("/hello")
-def hello():
-    return {"message": "Merhaba dünya!"}
-
-class User(BaseModel):
-    name: str
-    age: int
-
-@app.post("/users")
-def create_user(user: User):
-    return {"id": 1, "created": user}
-
-@app.get("/users/{user_id}")
-def get_user(user_id: int):
-    return {"id": user_id, "name": "John Doe", "age": 30}
-
-
 @app.post("/ai-analyze")
 def ai_analyze_with_gemini(filename: str = Body(..., embed=True)):
     file_path = os.path.join(TEST_RESULTS_DIR, filename)
@@ -349,41 +365,87 @@ def ai_analyze_with_gemini(filename: str = Body(..., embed=True)):
         result = json.load(f)
 
     prompt = f"""
-Aşağıda bir API'ye ait test sonuçları JSON formatında verilmiştir.
+Aşağıda bir API sistemine ait test sonuçları JSON formatında verilmiştir.
 
-Senin görevin bu çıktıyı detaylıca analiz ederek geliştiriciye **yalnızca geçerli bir JSON formatında** aşağıdaki bilgileri sağlamaktır:
-
-Lütfen yalnızca aşağıdaki JSON formatında ve Türkçe açıklamalarla dönüş yap:
+Görevin, bu veriyi detaylı şekilde analiz ederek, geliştiriciye teknik olarak değerlendirilebilecek, doğrudan aksiyon almasını sağlayacak nitelikte bir çıktı üretmektir. Çıktı mutlaka aşağıdaki JSON yapısında olmalı ve yalnızca bu formatta geri dönmelisin:
 
 {{
-  "success_count": int,                       
-  "failure_count": int,                       
-  "failures": [                               
+  "success_count": int,
+  "failure_count": int,
+  "failures": [
     {{
-      "url": "string",                        
-      "reason": "string"                      
+      "url": "string",
+      "reason": "string"
     }}
   ],
-  "performance_summary": "string",            
-  "recommendations": "string"                 
+  "performance_summary": "string",
+  "recommendations": "string"
 }}
 
-🧠 Açıklamalar için şunları dikkate al:
-- **Başarısız endpoint'leri detaylı açıkla** (404, 500, doğrulama hatası, eksik parametre vs. gibi olası nedenleri belirt).
-- **Yanıt sürelerini yorumla**: Yüksekse "bu endpoint'in yanıt süresi yüksek olabilir, önbellekleme (caching), sorgu optimizasyonu veya veri miktarı azaltımı düşünülebilir" gibi öneriler ver.
-- **Başarılı endpoint'ler hakkında da kısa bir değerlendirme yap** (örneğin: tümü istikrarlı çalışıyor mu?).
-- Gerekiyorsa **örnek performans iyileştirme yolları** öner (ör: sorgu filtreleme, pagination, arka planda işleme alma).
-- Teknik terimleri geliştirici seviyesine uygun sade ve anlaşılır bir dille kullan.
+---
 
-🛑 Kurallar:
-- JSON dışında hiçbir açıklama, markdown veya cümle yazma
-- Formatı bozma
-- Markdown kullanma (örneğin: ```json gibi)
+## 🧠 Analiz Metodolojisi:
 
-Test sonucu şu şekildedir:
+### 1. Başarısız Testler (`failures`)
+Her başarısız endpoint için:
+
+- HTTP `status_code` değerini yorumla:
+  - `400` → İstemci hatası, eksik parametre olabilir.
+  - `401` → Kimlik doğrulama eksik/yetersiz (Bearer Token unutulmuş olabilir).
+  - `403` → Yetki problemi. Roller, erişim kontrolü veya oturum eksikliği olabilir.
+  - `404` → Yanlış endpoint, hatalı path parametresi, veri bulunamadı.
+  - `422` → Gönderilen body içinde eksik veya hatalı veri. `null`, eksik alan, uyumsuz veri tipi.
+  - `500` → Sunucu taraflı hata. Database hatası, try-catch eksikliği, null reference, servis bağımlılığı olabilir.
+
+Her hata için örnek bir neden üret ve Swagger şemasına aykırılıklar varsa belirt.
+
+---
+
+### 2. Yanıt Süreleri (`performance_summary`)
+- `response_time` alanlarını topla ve analiz et.
+- Ortalama sürenin dışında kalan, belirgin yavaş çalışan endpoint'leri belirt.
+- En hızlı ve en yavaş endpoint'leri örnek URL ile birlikte belirt.
+- Yavaş istekler için öneriler:
+  - API tarafında veri büyüklüğü → pagination eksikliği
+  - Sorgu karmaşıklığı → SQL optimizasyonu gerekebilir
+  - Cache eksikliği → öner: Redis
+  - Sync çağrılar → öner: async/await yapılarına geçiş
+
+---
+
+### 3. Başarılı Testler (`success_count`)
+- Doğru status kodu dönenleri vurgula (örn: 200, 201, 204).
+- Hangi endpoint’lerin semantik olarak uygun status code kullandığını belirt (örnek: `201 Created` yerine `200 OK` kullanılmış olabilir).
+- Swagger ile test sonucu uyumlu mu, kontrol et.
+- Övgü niteliğinde kısa yorumlar sun (örn: "POST /users endpoint’i başarılı şekilde validasyon yapıyor ve doğru status kod dönüyor.")
+
+---
+
+### 4. Genel RESTful Uygulama Kalitesi (`recommendations`)
+Aşağıdaki kriterleri değerlendirerek tavsiyeler üret:
+
+- **URI yapısı:** endpoint'ler kaynak tabanlı mı? (`/user/delete` yerine `DELETE /user/{id}`)
+- **HTTP method kullanımı:** GET/POST/PUT/DELETE doğru mu kullanılmış?
+- **Parametre kullanımı:** Path ve query parametreleri tanımlı mı? Swagger'da eksik mi?
+- **Hata mesajları:** Anlamlı, alan bazlı ve anlaşılır mı? JSON hata yapıları semantik mi (`"detail": "email is required"` gibi).
+- **Swagger şeması:** `summary`, `description`, `example`, `default`, `schema` gibi alanlar tanımlı mı?
+- **OpenAPI coverage:** Swagger’da tüm endpoint'ler var mı? `POST`, `PUT`, `DELETE` gibi mutasyon işlemleri eksik olabilir mi?
+
+---
+
+## 🛑 Katı Kurallar:
+- Yalnızca belirtilen JSON formatında geri dön.
+- Markdown, kod bloğu, yorum, açıklama, yazı bloğu kullanma.
+- Geri dönüşünde `"reason"` açıklamaları geliştiriciye teknik düzeyde bilgi verecek şekilde yazılmalı.
+
+---
+
+### Test Sonucu:
 
 {json.dumps(result, indent=2)}
 """
+
+
 
 
     try:
@@ -408,3 +470,30 @@ Test sonucu şu şekildedir:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Gemini AI ile analiz başarısız oldu.")
+
+
+@app.post("/run-tests-from-url")
+async def run_tests_from_url(url: str = Body(..., embed=True)):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Veri alınamadı.")
+            data = response.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Veri çekme hatası: {str(e)}")
+
+    # Swagger mı kontrol et
+    if isinstance(data, dict) and ("swagger" in data or "openapi" in data):
+        # ✅ Swagger ise kaydet ve test et
+        filename = f"from_url_swagger_{int(time.time())}.json"
+        path = os.path.join(UPLOAD_DIR, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return await run_tests()  # base_url Swagger'dan çıkarılacak
+    else:
+        # ❌ Swagger değilse otomatik Swagger üret
+        gen_res = await generate_swagger_from_endpoint(url=url)
+        if not gen_res["success"]:
+            raise HTTPException(status_code=500, detail="Swagger otomatik üretilemedi.")
+        return await run_tests(base_url=url.rsplit("/", 1)[0])  # base_url kullanıcıdan alınır
