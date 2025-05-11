@@ -40,7 +40,7 @@ export default function UrlImportPage() {
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-xl w-full bg-white p-8 rounded shadow-md">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">
-          🌐 Tek URL ile API Testi
+          🔗 Tek URL ile API Testi
         </h1>
 
         <label
@@ -55,7 +55,7 @@ export default function UrlImportPage() {
           value={apiUrl}
           onChange={(e) => setApiUrl(e.target.value)}
           placeholder="https://api.example.com/endpoint veya /swagger.json"
-          className="w-full border border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+          className="w-full border text-neutral-800 border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
         />
         {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 

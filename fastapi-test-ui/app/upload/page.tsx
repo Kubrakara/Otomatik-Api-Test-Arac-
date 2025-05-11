@@ -80,15 +80,20 @@ export default function UploadPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="max-w-xl w-full bg-white p-8 rounded shadow-md">
-        <h1 className="text-xl font-bold text-gray-800 mb-6">
-          Swagger API Test Aracı
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">
+          🌐 Swagger API Test Aracı
         </h1>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-md font-medium text-gray-700 mb-1">
             Swagger JSON Dosyası
           </label>
-          <input type="file" accept=".json" onChange={handleFileChange} />
+          <input
+            type="file"
+            accept=".json"
+            className="text-neutral-400 border  px-3 py-2 rounded w-full"
+            onChange={handleFileChange}
+          />
         </div>
 
         {baseUrl && !manualBase && (
@@ -107,7 +112,7 @@ export default function UploadPage() {
               placeholder="https://api.example.com"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              className="w-full border px-3 py-2 rounded"
+              className="w-full text-gray-700 border px-3 py-2 rounded"
             />
             <p className="text-sm text-yellow-700 mt-1">
               ⚠️ Swagger dosyasında base URL bilgisi yok. Lütfen manuel girin.

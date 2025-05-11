@@ -5,8 +5,8 @@ interface Props {
     success_count: number;
     failure_count: number;
     failures: { url: string; reason: string }[];
-    performance_summary: string;
-    recommendations: string;
+    performance_summary: string[]; // ⬅️ Liste olarak güncellendi
+    recommendations: string[]; // ⬅️ Liste olarak güncellendi
   };
 }
 
@@ -59,18 +59,22 @@ export default function AiAnalysisParsed({ jsonObject }: Props) {
         <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-1">
           📊 Performans Özeti
         </h3>
-        <p className="text-sm text-blue-900 dark:text-blue-100 leading-relaxed">
-          {parsed.performance_summary}
-        </p>
+        <ul className="list-disc ml-6 space-y-1 text-sm text-blue-900 dark:text-blue-100">
+          {parsed.performance_summary.map((item, idx) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
       </div>
 
       <div className="bg-gray-100 dark:bg-gray-700/30 p-4 rounded shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
           💡 Öneriler
         </h3>
-        <p className="text-sm text-gray-800 dark:text-gray-300 leading-relaxed">
-          {parsed.recommendations}
-        </p>
+        <ul className="list-disc ml-6 space-y-1 text-sm text-gray-800 dark:text-gray-300">
+          {parsed.recommendations.map((item, idx) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
       </div>
     </div>
   );

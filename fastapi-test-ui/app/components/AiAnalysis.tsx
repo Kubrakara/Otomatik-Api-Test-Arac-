@@ -12,8 +12,8 @@ interface AIAnalysis {
   success_count: number;
   failure_count: number;
   failures: { url: string; reason: string }[];
-  performance_summary: string;
-  recommendations: string;
+  performance_summary: string[]; // Güncellendi: string yerine string[]
+  recommendations: string[]; // Güncellendi: string yerine string[]
 }
 
 export default function AiAnalysis({ filename }: Props) {
@@ -31,10 +31,19 @@ export default function AiAnalysis({ filename }: Props) {
       });
 
       const result = res.data?.analysis;
+
       const parsed: AIAnalysis =
         typeof result === "string" ? JSON.parse(result) : result;
 
-      setAnalysis(parsed);
+      // Tip kontrolü (opsiyonel ama güvenli)
+      if (
+        Array.isArray(parsed.performance_summary) &&
+        Array.isArray(parsed.recommendations)
+      ) {
+        setAnalysis(parsed);
+      } else {
+        throw new Error("Yanıt formatı beklenen yapıda değil.");
+      }
     } catch (err: any) {
       const message = axios.isAxiosError(err)
         ? err.response?.data?.detail || "Sunucu hatası."

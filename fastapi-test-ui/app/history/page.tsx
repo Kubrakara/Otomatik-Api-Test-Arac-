@@ -32,43 +32,59 @@ export default function HistoryPage() {
   }, []);
 
   return (
-    <main className="max-w-4xl mx-auto py-10 px-4">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">
+    <main className="min-h-screen bg-white max-w-5xl mx-auto py-10 px-4">
+      <h1 className="text-3xl font-bold text-gray-800 mb-8">
         📁 Geçmiş Testler
       </h1>
 
-      {loading && <p>Yükleniyor...</p>}
+      {loading && <div className="text-gray-600">Yükleniyor...</div>}
 
       {!loading && history.length === 0 && (
         <p className="text-gray-500">Henüz test geçmişi bulunmamaktadır.</p>
       )}
 
       {!loading && history.length > 0 && (
-        <table className="w-full table-auto border shadow text-sm bg-white rounded">
-          <thead className="bg-gray-100 text-left">
-            <tr>
-              <th className="border px-4 py-2">Tarih</th>
-              <th className="border px-4 py-2">Test Sayısı</th>
-              <th className="border px-4 py-2">İşlem</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((item, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="border px-4 py-2">{item.timestamp}</td>
-                <td className="border px-4 py-2">{item.test_count}</td>
-                <td className="border px-4 py-2">
-                  <button
-                    onClick={() => router.push(`/result?file=${item.filename}`)}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Detayları Gör
-                  </button>
-                </td>
+        <div className="overflow-x-auto rounded-lg shadow border border-gray-200 bg-white">
+          <table className="min-w-full text-sm text-gray-800">
+            <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wider">
+              <tr>
+                <th className="px-6 py-3 text-left">📅 Tarih</th>
+                <th className="px-6 py-3 text-left">🧪 Test Adı</th>
+                <th className="px-6 py-3 text-left">📊 Test Sayısı</th>
+                <th className="px-6 py-3 text-left">🔍 İşlem</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {history.map((item, idx) => (
+                <tr
+                  key={idx}
+                  className="hover:bg-gray-50 transition-colors border-t border-gray-200"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {item.timestamp}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {item.filename}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {item.test_count}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() =>
+                        router.push(`/result?file=${item.filename}`)
+                      }
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      Detayları Gör
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );

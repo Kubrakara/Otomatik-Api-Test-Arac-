@@ -132,7 +132,7 @@ async def run_tests(
         detected_base = f"{scheme}://{host}{base_path}"
 
     # Kullanıcının gönderdiği base_url varsa onu kullan, yoksa Swagger'dan çıkar
-    final_base_url = base_url.strip() if base_url and base_url.strip() else detected_base
+    final_base_url = base_url.strip() if isinstance(base_url, str) and base_url.strip() else detected_base
 
     if not final_base_url:
         raise HTTPException(status_code=400, detail="Base URL tespit edilemedi. Swagger'da da kullanıcıdan da gelmedi.")
@@ -378,8 +378,8 @@ Görevin, bu veriyi detaylı şekilde analiz ederek, geliştiriciye teknik olara
       "reason": "string"
     }}
   ],
-  "performance_summary": "string",
-  "recommendations": "string"
+  "performance_summary": ["string", "..."],
+  "recommendations": ["string", "..."]
 }}
 
 ---
@@ -424,12 +424,18 @@ Her hata için örnek bir neden üret ve Swagger şemasına aykırılıklar vars
 ### 4. Genel RESTful Uygulama Kalitesi (`recommendations`)
 Aşağıdaki kriterleri değerlendirerek tavsiyeler üret:
 
-- **URI yapısı:** endpoint'ler kaynak tabanlı mı? (`/user/delete` yerine `DELETE /user/{id}`)
+- **URI yapısı:** endpoint'ler kaynak tabanlı mı? (`/user/delete` yerine `DELETE /user/{{id}}`)
 - **HTTP method kullanımı:** GET/POST/PUT/DELETE doğru mu kullanılmış?
 - **Parametre kullanımı:** Path ve query parametreleri tanımlı mı? Swagger'da eksik mi?
 - **Hata mesajları:** Anlamlı, alan bazlı ve anlaşılır mı? JSON hata yapıları semantik mi (`"detail": "email is required"` gibi).
 - **Swagger şeması:** `summary`, `description`, `example`, `default`, `schema` gibi alanlar tanımlı mı?
 - **OpenAPI coverage:** Swagger’da tüm endpoint'ler var mı? `POST`, `PUT`, `DELETE` gibi mutasyon işlemleri eksik olabilir mi?
+- **Security:** Bearer Token, OAuth2, JWT gibi kimlik doğrulama mekanizmaları var mı? Swagger'da eksik olabilir mi?
+- **Rate limiting:** API'ye aşırı yüklenme durumunda sınırlama var mı? Swagger'da eksik olabilir mi?
+- **Logging:** API tarafında logging yapıları var mı? Swagger'da eksik olabilir mi?
+- **Versioning:** API versiyonlama yapısı var mı? Swagger'da eksik olabilir mi?
+- **Cache:** API'de cache yapısı var mı? Swagger'da eksik olabilir mi?
+- **CORS:** API'de CORS ayarları var mı? Swagger'da eksik olabilir mi?
 
 ---
 
@@ -437,6 +443,16 @@ Aşağıdaki kriterleri değerlendirerek tavsiyeler üret:
 - Yalnızca belirtilen JSON formatında geri dön.
 - Markdown, kod bloğu, yorum, açıklama, yazı bloğu kullanma.
 - Geri dönüşünde `"reason"` açıklamaları geliştiriciye teknik düzeyde bilgi verecek şekilde yazılmalı.
+- `"failures"` kısmında açıklamalar geliştiriciye teknik düzeyde bilgi verecek şekilde yazılmalı.
+- `"recommendations"` kısmında öneriler geliştiriciye teknik düzeyde bilgi verecek şekilde yazılmalı.
+- `"performance_summary"` kısmında öneriler geliştiriciye teknik düzeyde bilgi verecek şekilde yazılmalı.
+- `"performance_summary"` ve `"recommendations"` alanları **liste (array of strings)** formatında olmalıdır.
+- `"success_count"` ve `"failure_count"` alanları kesinlikle integer olmalı.
+- `"success_count"` ve `"failure_count"` alanları kesinlikle 0'dan büyük olmalı.
+- `"success_count"` ve `"failure_count"` alanları kesinlikle 0'dan küçük olamaz.
+- sadece türkçe yanıt ver.
+- JSON formatında olmayan bir yanıt verme.
+- JSON formatında olmayan bir yanıt verirsen, hata alırsın.
 
 ---
 
@@ -444,6 +460,7 @@ Aşağıdaki kriterleri değerlendirerek tavsiyeler üret:
 
 {json.dumps(result, indent=2)}
 """
+
 
 
 
@@ -490,10 +507,18 @@ async def run_tests_from_url(url: str = Body(..., embed=True)):
         path = os.path.join(UPLOAD_DIR, filename)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-        return await run_tests()  # base_url Swagger'dan çıkarılacak
+
+        # ⬇️ DÜZELTİLEN KISIM
+        return await run_tests(filename=filename)
+    
     else:
         # ❌ Swagger değilse otomatik Swagger üret
         gen_res = await generate_swagger_from_endpoint(url=url)
         if not gen_res["success"]:
             raise HTTPException(status_code=500, detail="Swagger otomatik üretilemedi.")
-        return await run_tests(base_url=url.rsplit("/", 1)[0])  # base_url kullanıcıdan alınır
+
+        return await run_tests(
+            base_url=url.rsplit("/", 1)[0],
+            filename=gen_res["filename"]
+        )
+
