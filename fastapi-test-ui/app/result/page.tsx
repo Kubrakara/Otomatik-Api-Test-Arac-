@@ -21,6 +21,7 @@ export default function ResultPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [generated, setGenerated] = useState(false);
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -29,7 +30,9 @@ export default function ResultPage() {
         const res = await axios.get(
           `http://localhost:8000/test-result/${filename}`
         );
+
         setResults(res.data.results || []);
+        setGenerated(!!res.data.generated); // otomatik swagger bilgisi
       } catch (err) {
         console.error("Sonuç alınamadı", err);
         setError("Sonuçlar alınamadı. Lütfen daha sonra tekrar deneyin.");
@@ -53,6 +56,13 @@ export default function ResultPage() {
         )}
 
         {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
+        {generated && (
+          <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-3 rounded text-sm mb-6">
+            ⚠️ Bu test, <strong>otomatik olarak üretilmiş</strong> bir Swagger
+            şeması üzerinden yapılmıştır. Endpoint detayları kısıtlı olabilir.
+          </div>
+        )}
 
         {!loading && results.length > 0 && (
           <>

@@ -8,10 +8,13 @@ export default function UrlImportPage() {
   const [apiUrl, setApiUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
   const router = useRouter();
 
   const handleStartTest = async () => {
     setError("");
+    setNote("");
+
     if (!apiUrl.trim()) {
       setError("Lütfen geçerli bir API URL'i girin.");
       return;
@@ -24,8 +27,14 @@ export default function UrlImportPage() {
         url: apiUrl,
       });
 
+      if (res.data?.note) {
+        setNote(res.data.note); // Otomatik Swagger üretildi bilgisi
+      }
+
       const filename = res.data.saved_as;
-      router.push(`/result?file=${filename}`);
+      setTimeout(() => {
+        router.push(`/result?file=${filename}`);
+      }, 1500); // kullanıcı notu görebilsin diye hafif gecikme
     } catch (err) {
       console.error(err);
       setError(
@@ -49,15 +58,23 @@ export default function UrlImportPage() {
         >
           API veya Swagger JSON URL
         </label>
+
         <input
           id="api-url"
           type="url"
           value={apiUrl}
           onChange={(e) => setApiUrl(e.target.value)}
           placeholder="https://api.example.com/endpoint veya /swagger.json"
-          className="w-full border text-neutral-800 border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+          className="w-full border border-gray-300 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-neutral-800 mb-2"
         />
+
         {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+
+        {note && (
+          <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-2 rounded text-sm mb-4">
+            ⚠️ {note}
+          </div>
+        )}
 
         <button
           onClick={handleStartTest}

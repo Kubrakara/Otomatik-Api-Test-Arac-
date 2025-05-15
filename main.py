@@ -34,23 +34,43 @@ os.makedirs(TEST_RESULTS_DIR, exist_ok=True)
 
 # 🔧 Örnek payload üretici
 def generate_sample_data(schema: dict) -> dict:
+    # Eğer $ref varsa onu çözümle
+    if "$ref" in schema and schema["$ref"] == "#/components/schemas/User":
+        return {
+            "username": "testuser",
+            "email": "test@example.com",
+            "is_active": True
+        }
+
+    # Diğer generic JSON şemalar için fallback (liste, obje vs.)
     sample = {}
     properties = schema.get("properties", {})
+    required = schema.get("required", [])
+
     for key, prop in properties.items():
-        typ = prop.get("type", "string")
-        if typ == "string":
+        if "example" in prop:
+            sample[key] = prop["example"]
+        elif prop.get("type") == "string":
             sample[key] = f"{key}_example"
-        elif typ == "integer":
-            sample[key] = random.randint(1, 100)
-        elif typ == "boolean":
+        elif prop.get("type") == "integer":
+            sample[key] = 1
+        elif prop.get("type") == "boolean":
             sample[key] = True
-        elif typ == "array":
+        elif prop.get("type") == "array":
             sample[key] = []
-        elif typ == "object":
+        elif prop.get("type") == "object":
             sample[key] = {}
         else:
-            sample[key] = None
+            sample[key] = "default"
+
+        if key in required and sample[key] in [None, ""]:
+            sample[key] = f"{key}_value"
+
     return sample
+
+
+
+
 
 
 # 📥 Swagger dosyası yükleme
@@ -95,13 +115,9 @@ async def upload_swagger(file: UploadFile = File(...)):
 @app.post("/run-tests")
 async def run_tests(
     base_url: Optional[str] = Body(None, embed=True),
-    filename: Optional[str] = Body(None, embed=True)
+    filename: Optional[str] = Body(None, embed=True),
+    is_generated: bool = False  # otomatik mi üretildi bilgisi
 ):
-    """
-    Swagger tabanlı API testlerini çalıştırır.
-    `base_url` girilmemişse Swagger'dan alınır.
-    `filename` verilirse ilgili dosya test edilir, verilmezse son yüklenen dosya test edilir.
-    """
     try:
         # Dosya yolu belirleme
         if filename:
@@ -120,7 +136,7 @@ async def run_tests(
     with open(swagger_path, "r", encoding="utf-8") as f:
         swagger_json = json.load(f)
 
-    # Swagger'dan base URL tespiti
+    # Base URL tespiti
     detected_base = None
     if "openapi" in swagger_json:
         servers = swagger_json.get("servers", [])
@@ -131,11 +147,10 @@ async def run_tests(
         base_path = swagger_json.get("basePath", "")
         detected_base = f"{scheme}://{host}{base_path}"
 
-    # Kullanıcının gönderdiği base_url varsa onu kullan, yoksa Swagger'dan çıkar
     final_base_url = base_url.strip() if isinstance(base_url, str) and base_url.strip() else detected_base
 
     if not final_base_url:
-        raise HTTPException(status_code=400, detail="Base URL tespit edilemedi. Swagger'da da kullanıcıdan da gelmedi.")
+        raise HTTPException(status_code=400, detail="Base URL tespit edilemedi.")
 
     # Test işlemleri
     test_results = []
@@ -205,9 +220,9 @@ async def run_tests(
 
     return {
         **result_data,
-        "saved_as": result_filename
+        "saved_as": result_filename,
+        "generated": is_generated  # burada ekliyoruz
     }
-
 
 
 # 🌐 Swagger URL'den içe aktarma
@@ -318,7 +333,8 @@ async def generate_swagger_from_endpoint(url: str = Body(..., embed=True)):
         "filename": filename,
         "endpoint": url,
         "swagger_path": "/" + url.split("/")[-1],
-        "detected_fields": list(properties.keys())
+        "detected_fields": list(properties.keys()),
+        "note": "Bu Swagger, JSON endpoint'ten otomatik olarak üretilmiştir."
     }
 
 @app.get("/test-history")
@@ -500,25 +516,25 @@ async def run_tests_from_url(url: str = Body(..., embed=True)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Veri çekme hatası: {str(e)}")
 
-    # Swagger mı kontrol et
+    # Swagger mı kontrolü
     if isinstance(data, dict) and ("swagger" in data or "openapi" in data):
-        # ✅ Swagger ise kaydet ve test et
         filename = f"from_url_swagger_{int(time.time())}.json"
         path = os.path.join(UPLOAD_DIR, filename)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        # ⬇️ DÜZELTİLEN KISIM
-        return await run_tests(filename=filename)
-    
-    else:
-        # ❌ Swagger değilse otomatik Swagger üret
-        gen_res = await generate_swagger_from_endpoint(url=url)
-        if not gen_res["success"]:
-            raise HTTPException(status_code=500, detail="Swagger otomatik üretilemedi.")
-
         return await run_tests(
-            base_url=url.rsplit("/", 1)[0],
-            filename=gen_res["filename"]
+            filename=filename,
+            is_generated=False  # zaten Swagger dosyası
         )
 
+    # Swagger değil → otomatik üret
+    gen_res = await generate_swagger_from_endpoint(url=url)
+    if not gen_res["success"]:
+        raise HTTPException(status_code=500, detail="Swagger otomatik üretilemedi.")
+
+    return await run_tests(
+        filename=gen_res["filename"],
+        base_url=url.rsplit("/", 1)[0],
+        is_generated=True
+    )

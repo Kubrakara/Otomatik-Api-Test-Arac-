@@ -1,0 +1,27 @@
+Fonksiyonel olarak şunları yapar:
+✅ Yüklenen veya URL’den çekilen Swagger dosyalarını okur.
+✅ Swagger’daki endpoint’leri otomatik keşfeder.
+✅ GET, POST, PUT gibi çağrıları test amaçlı gönderir (otomatik payload üreterek).
+✅ Çalıştırılan testlerin yanıt sürelerini ve başarı/başarısız durumlarını kaydeder.
+✅ Test sonuçlarını dosyalara yazar ve ayrıca Google Gemini API’ye göndererek yapay zeka tabanlı analiz alır.
+✅ Sonuçları geliştiriciye teknik tavsiyelerle birlikte sunar.
+
+
+| Fonksiyon / Endpoint                        | İşlev                                                                                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| */upload-swagger*                         | Kullanıcının yüklediği .json uzantılı Swagger/OpenAPI dosyasını sisteme yükler, içindeki tüm endpoint ve metotları listeler.                    |
+| */run-tests*                              | Yüklenen Swagger dosyasındaki tüm endpoint’lere karşı otomatik testler çalıştırır. POST/PUT için sahte (örnek) JSON payload’lar üretir.           |
+| */import-swagger*                         | Harici bir URL’den Swagger dosyasını indirir ve sisteme kaydeder.                                                                                 |
+| */generate-swagger-from-endpoint*         | Swagger’ı olmayan bir API endpoint’inden çektiği JSON cevabına göre otomatik bir Swagger şablonu üretir (örnek veri tiplerini çıkarır).           |
+| */test-history*                           | Daha önce kaydedilen test sonuçlarının listesini döner.                                                                                           |
+| */test-result/{filename}*                 | Belirli bir test sonucu dosyasını detaylı olarak okur ve geri döner.                                                                              |
+| */ai-analyze*                             | Kaydedilen bir test sonucu dosyasını Google Gemini API’ye göndererek detaylı analiz raporu alır (başarı, başarısızlık, performans, öneriler vs.). |
+| */run-tests-from-url*                     | Bir URL’den Swagger çeker veya JSON’dan Swagger üreterek hemen test çalıştırır.                                                                   |
+| *generate\_sample\_data* (yardımcı fonk.) | Swagger’daki schema bilgisine göre sahte test payload’ı üretir (örneğin, "name": "name_example").                                             |
+
+
+💼 Kurumsal Fayda ve Kullanım Alanları
+✅ Geliştirici ekiplerinin hızlı geri bildirim alarak API kalitesini artırmasını sağlar.
+✅ CI/CD hatlarına eklenerek otomatik test ve raporlama imkânı sunar.
+✅ Swagger/OpenAPI uyumluluğu kontrolü ve iyileştirme önerileri getirir.
+✅ Yönetim veya kalite ekiplerine kolayca sunulabilecek analiz raporları üretir.
