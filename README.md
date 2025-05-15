@@ -44,7 +44,7 @@ Otomatik API Test Aracı, Python tabanlı bir FastAPI uygulaması ile TypeScript
 ## 💡 Katkıda Bulunma
 
 1. Fork'layıp destek olabilirsiniz. 📌
-![Uploading flask.png…]()
+----
 
 ---
 
