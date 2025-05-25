@@ -11,7 +11,7 @@ Otomatik API Test Aracı, Python tabanlı bir FastAPI uygulaması ile TypeScript
 
 ---
 
-## 🚀 Özellikler
+##  Özellikler
 
 - ✅ REST API endpoint'lerinin manuel veya otomatik test edilmesi  
 - 🤖 **Gemini AI** desteğiyle test sonuçlarının akıllı analiz edilmesi  
@@ -45,10 +45,6 @@ Otomatik API Test Aracı, Python tabanlı bir FastAPI uygulaması ile TypeScript
 
 1. Fork'layıp destek olabilirsiniz. 📌
 ----
-
----
-
-## 📞 İletişim
 
 Proje ile ilgili her türlü geri bildirimi issue olarak açabilir veya doğrudan katkı sunabilirsiniz.
 
